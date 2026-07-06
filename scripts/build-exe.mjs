@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const electronDist = path.join(root, "electron-dist");
-const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-const outDir = path.join(root, "release", `win-${stamp}`);
+const outDir = path.join(root, "release", "win-portable");
 const appDest = path.join(outDir, "resources", "app");
+const serverDest = path.join(outDir, "resources", "server");
+const nodeDest = path.join(outDir, "resources", "node");
 
 function rm(p) {
   try {
@@ -40,16 +41,22 @@ fs.mkdirSync(appDest, { recursive: true });
 cp(path.join(root, "electron"), path.join(appDest, "electron"));
 cp(path.join(root, "package.json"), path.join(appDest, "package.json"));
 const standaloneSrc = path.join(root, ".next", "standalone");
-const standaloneDest = path.join(appDest, ".next", "standalone");
-cp(standaloneSrc, standaloneDest);
+cp(standaloneSrc, serverDest);
 
 console.log("Copying static assets into standalone...");
 const staticSrc = path.join(root, ".next", "static");
-const staticDest = path.join(standaloneDest, ".next", "static");
+const staticDest = path.join(serverDest, ".next", "static");
 if (fs.existsSync(staticSrc)) cp(staticSrc, staticDest);
 const publicSrc = path.join(root, "public");
-const publicDest = path.join(standaloneDest, "public");
+const publicDest = path.join(serverDest, "public");
 if (fs.existsSync(publicSrc)) cp(publicSrc, publicDest);
+
+console.log("Copying bundled Node.js runtime...");
+if (fs.existsSync(path.join(root, "vendor", "node"))) {
+  cp(path.join(root, "vendor", "node"), nodeDest);
+} else {
+  console.warn("vendor/node not found; the built app will fall back to a system Node.js on PATH.");
+}
 
 console.log("Renaming electron.exe...");
 const exeFrom = path.join(outDir, "electron.exe");

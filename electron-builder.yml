@@ -1,0 +1,19 @@
+appId: com.medtrans.ai
+productName: MedTrans AI Assistant
+directories:
+  output: release
+  buildResources: electron
+electronDist: electron-dist
+files:
+  - electron
+  - package.json
+extraResources:
+  - from: .next/standalone
+    to: server
+  - from: vendor/node
+    to: node
+win:
+  target: portable
+  icon: electron/icon.ico
+portable:
+  artifactName: MedTrans-AI-Assistant.exe

@@ -11,33 +11,36 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "dist": "bun run build && bun run dist:electron",
+    "dist": "bun run build:exe",
     "dist:electron": "electron-builder",
     "build:exe": "bun run build && node scripts/build-exe.mjs"
   },
   "build": {
     "appId": "com.medtrans.ai",
     "productName": "MedTrans AI Assistant",
-    "files": [],
-    "asar": false,
-    "extraResources": [
-      {
-        "from": ".next/standalone",
-        "to": "."
-      }
-    ],
     "directories": {
-      "output": "release"
-    },
-    "asar": false,
-    "win": {
-      "target": "nsis",
-      "icon": "electron/icon.ico"
+      "output": "release",
+      "buildResources": "electron"
     },
     "electronDist": "electron-dist",
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+    "asar": false,
+    "files": [
+      "electron",
+      "package.json",
+      ".next/standalone"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/node",
+        "to": "node"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "electron/icon.ico"
+    },
+    "portable": {
+      "artifactName": "MedTrans-AI-Assistant.exe"
     }
   },
   "dependencies": {
