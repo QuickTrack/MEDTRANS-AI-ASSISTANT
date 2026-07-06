@@ -1,13 +1,44 @@
 {
-  "name": "nextjs-template",
+  "name": "medtrans-ai-assistant",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
+  "description": "MedTrans AI Assistant desktop app",
+  "author": "MedTrans",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dist": "bun run build && bun run dist:electron",
+    "dist:electron": "electron-builder",
+    "build:exe": "bun run build && node scripts/build-exe.mjs"
+  },
+  "build": {
+    "appId": "com.medtrans.ai",
+    "productName": "MedTrans AI Assistant",
+    "files": [],
+    "asar": false,
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "."
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "asar": false,
+    "win": {
+      "target": "nsis",
+      "icon": "electron/icon.ico"
+    },
+    "electronDist": "electron-dist",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "next": "^16.1.3",
@@ -15,13 +46,15 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "@tailwindcss/postcss": "^4.1.17",
     "@types/node": "^24.10.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "@tailwindcss/postcss": "^4.1.17",
-    "tailwindcss": "^4.1.17",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.39.1",
-    "eslint-config-next": "^16.0.0"
+    "eslint-config-next": "^16.0.0",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3"
   }
 }
