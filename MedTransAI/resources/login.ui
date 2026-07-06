@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>LoginWindow</class>
+ <widget class="QWidget" name="LoginWindow">
+  <property name="windowTitle">
+   <string>MedTrans AI Assistant — Login</string>
+  </property>
+  <layout class="QVBoxLayout" name="root">
+   <item>
+    <widget class="QFrame" name="card">
+     <property name="objectName">
+      <string>card</string>
+     </property>
+     <layout class="QVBoxLayout" name="card_layout">
+      <item>
+       <widget class="QLabel" name="title">
+        <property name="objectName">
+         <string>title</string>
+        </property>
+        <property name="text">
+         <string>MedTrans AI Assistant</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="user">
+        <property name="placeholderText">
+         <string>Username</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="pwd">
+        <property name="echoMode">
+         <enum>QLineEdit::Password</enum>
+        </property>
+        <property name="placeholderText">
+         <string>Password</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="login_btn">
+        <property name="objectName">
+         <string>primary</string>
+        </property>
+        <property name="text">
+         <string>Login</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

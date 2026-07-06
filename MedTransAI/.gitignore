@@ -1,0 +1,37 @@
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# Build artifacts
+build/
+dist/
+*.spec.bak
+
+# App data (runtime)
+logs/
+exports/*.docx
+exports/*.pdf
+exports/*.txt
+exports/*.json
+exports/*.csv
+recordings/*
+temp/*
+!temp/.gitkeep
+database/*.db
+database/*.db-wal
+database/*.db-shm
+config/credentials.enc
+config/.key
+config/session.json
+
+# Crash reports
+logs/crash_*.log
+
+# IDE
+.vscode/
+.idea/

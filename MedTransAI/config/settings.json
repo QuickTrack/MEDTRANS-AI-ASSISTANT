@@ -1,0 +1,88 @@
+{
+  "name": "MedTrans AI Assistant",
+  "version": "1.0.0",
+  "base_dir": "/workspace/5a6a7809-17a7-4aff-881d-f72790f95325/sessions/agent_d5e0c6c5-9249-4ed9-82b8-fd2ca3b02731/MedTransAI",
+  "theme": "dark",
+  "language": "en",
+  "auto_login": false,
+  "remember_me": false,
+  "hotkeys": {
+    "play_pause": "Space",
+    "save_draft": "Ctrl+S",
+    "export": "Ctrl+E",
+    "search": "Ctrl+F",
+    "undo": "Ctrl+Z",
+    "redo": "Ctrl+Shift+Z"
+  },
+  "database": {
+    "file": "database/medtrans.db"
+  },
+  "paths": {
+    "logs": "logs",
+    "exports": "exports",
+    "recordings": "recordings",
+    "temp": "temp",
+    "assets": "assets",
+    "resources": "resources"
+  },
+  "browser": {
+    "headless": false,
+    "persistent_context": true,
+    "context_dir": "temp/browser_profile",
+    "target_url": "",
+    "navigation_timeout_ms": 30000,
+    "action_timeout_ms": 10000,
+    "max_retries": 3
+  },
+  "audio": {
+    "supported_formats": [
+      ".mp3",
+      ".wav",
+      ".ogg",
+      ".webm",
+      ".m4a",
+      ".aac"
+    ],
+    "target_format": "wav",
+    "sample_rate": 16000,
+    "normalize": true,
+    "noise_reduction": true,
+    "trim_silence": true,
+    "default_speed": 1.0
+  },
+  "ai": {
+    "model_size": "large-v3",
+    "device": "auto",
+    "compute_type": "auto",
+    "beam_size": 5,
+    "language": "auto",
+    "use_cuda": true,
+    "cpu_threads": 0
+  },
+  "export": {
+    "folder": "exports",
+    "include_footer": true,
+    "include_page_numbers": true,
+    "hospital_name": "",
+    "logo_path": "",
+    "formats": [
+      "docx",
+      "pdf",
+      "txt",
+      "json",
+      "csv"
+    ]
+  },
+  "security": {
+    "credentials_file": "config/credentials.enc",
+    "key_file": "config/.key",
+    "session_file": "config/session.json"
+  },
+  "logging": {
+    "level": "INFO",
+    "max_bytes": 5000000,
+    "backup_count": 5,
+    "crash_report": true
+  },
+  "_cache": {}
+}

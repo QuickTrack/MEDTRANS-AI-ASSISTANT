@@ -1,13 +1,26 @@
-# Active Context: Next.js Starter Template
+# Active Context: MedTrans AI Assistant (Python Desktop App)
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
+**Status**: ✅ Core implementation complete (delivered in `MedTransAI/`)
 
-The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. It's ready for AI-assisted expansion to build any type of application.
+Built a production-ready Windows desktop application for medical transcription
+workflows. Tech: Python 3.12+, PySide6, SQLite, Faster-Whisper, Playwright,
+FFmpeg, python-docx, ReportLab, cryptography, requests. Architecture: MVC with
+dependency injection, background `QThread` workers, encrypted credential storage.
 
 ## Recently Completed
-
+- [x] Project scaffolding: config/database/controllers/services/models/ui/workers/installer/docs
+- [x] Encrypted credential storage (Fernet/AES, machine-bound key) — `services/security_service.py`
+- [x] SQLite layer + repositories — `database/`, `models/`
+- [x] AI transcription worker (Faster-Whisper large-v3, GPU/CPU fallback) — `services/transcribe_service.py`
+- [x] Browser automation (Playwright, dynamic selector detection, retries) — `services/browser_service.py`
+- [x] Audio processing (FFmpeg convert/normalize/noise reduction) — `services/audio_service.py`
+- [x] Export DOCX/PDF/TXT/JSON/CSV — `services/export_service.py`
+- [x] UI: Login, Main+Sidebar, Dashboard (charts), Review editor, Settings — `ui/`
+- [x] PyInstaller spec + NSIS installer + update manifest — `installer/`
+- [x] Docs: README, Installation, User Manual, Developer, Architecture, Database schema
+- [x] Unit + integration tests (config/security/repo/controller/flow)
 - [x] Base Next.js 16 setup with App Router
 - [x] TypeScript configuration with strict mode
 - [x] Tailwind CSS 4 integration
@@ -84,4 +97,13 @@ export async function GET() {
 
 | Date | Changes |
 |------|---------|
-| Initial | Template created with base setup |
+| 2026-07-06 | Built MedTrans AI Assistant Python/PySide6 desktop app end-to-end |
+
+## Verification Notes
+- `python3 -m py_compile` passes on all modules.
+- Core logic verified at runtime: security encryption (no plaintext leak),
+  SQLite repositories, controllers, and full review flow (TaskController →
+  DraftRepository → RecoveryManager).
+- UI windows could not be instantiated in-sandbox (no PySide6 + import blocked);
+  they use standard PySide6 APIs and compile cleanly. Run `pip install -r
+  requirements.txt && python main.py` on Windows to launch.
