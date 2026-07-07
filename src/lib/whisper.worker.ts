@@ -75,14 +75,15 @@ ctx.onmessage = async (e: MessageEvent) => {
       16000
     );
     const wantTs = Boolean(msg.returnTimestamps);
+    const opts: Record<string, unknown> = {
+      task: "transcribe",
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      return_timestamps: wantTs,
+    };
+    if (msg.language) opts.language = msg.language;
     try {
-      const out = await transcriber(input, {
-        language: msg.language,
-        task: "transcribe",
-        chunk_length_s: 30,
-        stride_length_s: 5,
-        return_timestamps: wantTs,
-      });
+      const out = await transcriber(input, opts);
       const chunks = wantTs
         ? ((out as { chunks?: Array<{ text: string; timestamp: [number, number] }> })
             .chunks ?? []

@@ -185,7 +185,7 @@ export function useWhisper(
           id,
           audio: windowArr,
           samplingRate: sr,
-          language: whisperLang(langRef.current),
+          language: whisperLang(langRef.current) || undefined,
         },
         [windowArr.buffer]
       );
@@ -413,7 +413,7 @@ export function useWhisper(
               id,
               audio: seg,
               samplingRate: sr,
-              language: whisperLang(langRef.current),
+              language: whisperLang(langRef.current) || undefined,
             },
             [seg.buffer]
           );

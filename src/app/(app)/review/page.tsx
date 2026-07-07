@@ -23,6 +23,7 @@ function ReviewInner() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [targetLang, setTargetLang] = useState("en-US");
+  const [srcLang, setSrcLang] = useState("en-US");
   const [translated, setTranslated] = useState("");
   const loadedRef = useRef<string | null>(null);
   const translate = useTranslate();
@@ -40,6 +41,7 @@ function ReviewInner() {
     setTitle(job?.title ?? "");
     setTranslated(job?.translation ?? "");
     setTargetLang(job?.translationLang ?? "en-US");
+    setSrcLang(job?.language && job.language !== "auto" ? job.language : "en-US");
   }, [jobId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -81,9 +83,7 @@ function ReviewInner() {
 
   async function handleTranslate() {
     if (!text.trim() || translate.translating) return;
-    const src = floresLang(
-      getJob(jobId ?? "")?.language ?? "en-US"
-    );
+    const src = floresLang(srcLang);
     const tgt = floresLang(targetLang);
     const out = await translate.translate(text, src, tgt);
     if (out) {
@@ -233,8 +233,22 @@ function ReviewInner() {
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <select
+                  value={srcLang}
+                  onChange={(e) => setSrcLang(e.target.value)}
+                  aria-label="Source language"
+                  className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
+                >
+                  {LANGUAGES.filter((l) => l.code !== "auto").map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-slate-400">→</span>
+                <select
                   value={targetLang}
                   onChange={(e) => setTargetLang(e.target.value)}
+                  aria-label="Target language"
                   className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
                 >
                   {LANGUAGES.map((l) => (

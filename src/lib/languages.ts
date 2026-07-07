@@ -6,6 +6,7 @@ export type Language = {
 };
 
 export const LANGUAGES: Language[] = [
+  { code: "auto", label: "Auto-detect", whisper: "", flores: "eng_Latn" },
   { code: "en-US", label: "English", whisper: "english", flores: "eng_Latn" },
   { code: "fr-FR", label: "French", whisper: "french", flores: "fra_Latn" },
   { code: "es-ES", label: "Spanish", whisper: "spanish", flores: "spa_Latn" },

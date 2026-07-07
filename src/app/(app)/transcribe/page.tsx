@@ -27,7 +27,7 @@ function fmt(sec: number) {
 export default function TranscribePage() {
   const router = useRouter();
 
-  const [lang, setLang] = useState(LANGS[0].code);
+  const [lang, setLang] = useState("auto");
   const langLabel = LANGS.find((l) => l.code === lang)?.label ?? lang;
 
   const [file, setFile] = useState<File | null>(null);
