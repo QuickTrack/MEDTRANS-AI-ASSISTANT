@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand: #2d7ff9;
+  --color-brand-dark: #1f5fd1;
+  --color-accent: #32d583;
+  --color-canvas: #f8fafc;
+  --color-ink: #0f172a;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+html.dark body {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+/* Thin scrollbars for the app shell */
+.scroll-slim::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 999px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinner {
+  animation: spin 1s linear infinite;
+}

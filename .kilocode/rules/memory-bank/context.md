@@ -27,14 +27,28 @@ dependency injection, background `QThread` workers, encrypted credential storage
 - [x] ESLint configuration
 - [x] Memory bank documentation
 - [x] Recipe system for common features
+- [x] Built real MedTrans Next.js UI: login (auth gate), app shell (sidebar+topbar), Dashboard, Transcribe (audio upload + simulated Whisper pipeline), Review editor, Export, Settings (dark mode + persistence)
+- [x] Hardened `electron/main.js`: single-instance lock (no more EADDRINUSE from repeated launches), free-port detection, bundled Node fallback, graceful error page
+- [x] Replaced all hardcoded dummy data with REAL functionality: live microphone transcription via the browser Web Speech API (`src/lib/speech.ts`), live level meter + MediaRecorder capture (`src/lib/audio.ts`), and a localStorage-backed jobs store (`src/lib/jobs.ts`) that feeds real stats to Dashboard / Review / Export.
+- [x] Transcribe page now records in real time (live interim+final transcript, timer, mic meter) and persists the session as a job.
+- [x] Review page loads the real transcript for `?job=<id>`; Export builds the real document (txt/docx/pdf/json/csv) from it; Dashboard computes jobs-today / completed / throughput / language mix / storage from the store.
+- [x] Replaced the browser Web Speech API (Google cloud — failed with "network" error) with fully OFFLINE local Whisper via `@huggingface/transformers` (`src/lib/speech.ts` → `useWhisper`). Captures mic (AnalyserNode meter + MediaRecorder), transcribes in chunks every 3s during recording, final pass on stop; downloads model once, no Google dependency.
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Global styles | ✅ Ready |
+| `src/app/layout.tsx` | Root layout + providers (theme/auth) | ✅ Ready |
+| `src/app/login/page.tsx` | Login (auth gate) | ✅ Ready |
+| `src/app/(app)/layout.tsx` | Authed shell (sidebar + gate) | ✅ Ready |
+| `src/app/(app)/dashboard/page.tsx` | Dashboard (stats/charts) | ✅ Ready |
+| `src/app/(app)/transcribe/page.tsx` | Live mic recording + real-time Web Speech transcription | ✅ Ready |
+| `src/app/(app)/review/page.tsx` | Review editor (loads real job transcript) | ✅ Ready |
+| `src/app/(app)/export/page.tsx` | Export (builds real doc from transcript) | ✅ Ready |
+| `src/app/(app)/settings/page.tsx` | Settings (theme/langs/security) | ✅ Ready |
+| `src/components/` | ui primitives, Sidebar, Topbar, icons | ✅ Ready |
+| `src/lib/` | auth + theme providers, `jobs.ts` (store), `speech.ts` (`useWhisper` local Whisper), `audio.ts` (unused mic helper) | ✅ Ready |
+| `electron/main.js` | Hardened Electron main | ✅ Ready |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
 
 ## Current Focus
@@ -100,6 +114,13 @@ export async function GET() {
 | 2026-07-06 | Built MedTrans AI Assistant Python/PySide6 desktop app end-to-end |
 | 2026-07-06 | Added Electron desktop packaging for the Next.js app (portable `.exe`) |
 | 2026-07-07 | Fixed "Cannot find module 'next'" at runtime: `build-exe.mjs` now bundles Node (`vendor/node`→`resources/node`) and places the standalone server at `resources/server` (with its `node_modules`); `dist` now uses `build:exe`. Original electron-builder artifact was a stale build missing `.next/standalone/node_modules`. |
+| 2026-07-07 | Replaced placeholder "Next.js Template" UI with a real MedTrans AI Assistant Next.js app (login-gated shell + Dashboard/Transcribe/Review/Export/Settings) and hardened `electron/main.js` (single-instance lock, free-port detection, graceful errors). Rebuilt `release/win-portable/MedTrans AI Assistant.exe`. |
+| 2026-07-07 | Removed all hardcoded dummy data: added `src/lib/jobs.ts` (localStorage jobs store), `src/lib/speech.ts` (Web Speech API real-time STT), `src/lib/audio.ts` (mic level meter + MediaRecorder), and rewired Transcribe/Review/Export/Dashboard to use real audio + real computed data. `bun lint`, `bun typecheck`, and `next build` all pass. |
+| 2026-07-07 | Fixed "Speech error: network" (Web Speech API = Google cloud). Switched to OFFLINE local Whisper via `@huggingface/transformers` (`useWhisper` in `src/lib/speech.ts`): mic capture + meter + chunked live transcription + final pass on stop. Rebuilt `release/win-portable`. lint/typecheck/build pass. |
+| 2026-07-07 | Fixed "Model not ready" after Whisper download: `pipeline()` session init failed because onnxruntime-web needed SharedArrayBuffer (cross-origin isolation) which the Next standalone server doesn't send. Fix: `env.backends.onnx.wasm.numThreads = 1` (uses asyncify WASM, no SAB) + dtype fallback q8→fp32 + surface the real load error. WASM is bundled by Next into `static/media` (no CDN). Rebuilt. |
+| 2026-07-07 | Fixed `ERROR_CODE:1 weight_merged_0_scale ... DequantizeLinear`: the `q8` weights of `Xenova/whisper-base` are missing the decoder-embedding NBits scale in transformers.js v4 (session creation fails lazily on first inference, so the q8→fp32 fallback never engaged). Fix: use `dtype:"fp32"` only (standard weights, no NBits bug) + surface transcription errors in `transcribe()`. Rebuilt. |
+| 2026-07-07 | Fixed lag + inaccurate capture: moved Whisper inference into a Web Worker (`src/lib/whisper.worker.ts`) so the main thread is not blocked (which was starving the ScriptProcessor microphone capture and dropping samples). Transcribe incrementally in ~6s windows with 1.5s overlap (not re-transcribing the whole buffer every 3s), and use linear-resampling to 16k. UI badge shows "Transcribing…" while a window is in flight. Rebuilt. |
+| 2026-07-07 | Added direct file transcription (WAV/MP3) alongside live mic. `useWhisper.transcribeFile(file)` decodes audio via `AudioContext.decodeAudioData`, mixes to mono, splits into 30s windows, feeds the same worker (linear-resampled to 16k), streams results into the live transcript, and finalizes a job with the file's URL/size/duration. No mic needed. `transcribeFile`/`fileTranscribing`/`fileProgress` exposed. Rebuilt. |
 
 ## Electron Desktop Packaging (2026-07-06)
 
