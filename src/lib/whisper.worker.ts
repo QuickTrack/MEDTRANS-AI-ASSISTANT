@@ -49,6 +49,22 @@ function resample(audio: Float32Array, fromRate: number, toRate: number) {
   return out;
 }
 
+function rms(audio: Float32Array): number {
+  let s = 0;
+  for (let i = 0; i < audio.length; i++) s += audio[i] * audio[i];
+  return Math.sqrt(s / Math.max(1, audio.length));
+}
+
+function normalize(audio: Float32Array): Float32Array {
+  let peak = 0;
+  for (let i = 0; i < audio.length; i++) peak = Math.max(peak, Math.abs(audio[i]));
+  if (peak < 1e-4) return audio;
+  const g = 0.95 / peak;
+  const out = new Float32Array(audio.length);
+  for (let i = 0; i < audio.length; i++) out[i] = audio[i] * g;
+  return out;
+}
+
 ctx.onmessage = async (e: MessageEvent) => {
   const msg = e.data;
   if (!msg || typeof msg !== "object") return;
@@ -76,11 +92,9 @@ ctx.onmessage = async (e: MessageEvent) => {
   if (msg.type === "detect") {
     try {
       if (!classifier) {
-        classifier = (await pipeline(
-          "audio-classification",
-          LANG_ID_MODEL,
-          {
-            dtype: "q8",
+        const load = (dtype: "q8" | "fp32") =>
+          pipeline("audio-classification", LANG_ID_MODEL, {
+            dtype,
             device: "wasm",
             progress_callback: (p: ProgressInfo) => {
               if (p.status === "progress" && p.total) {
@@ -91,23 +105,25 @@ ctx.onmessage = async (e: MessageEvent) => {
                 });
               }
             },
-          }
-        )) as unknown as LangIdPipeline;
+          }) as unknown as LangIdPipeline;
+        try {
+          classifier = await load("q8");
+        } catch {
+          classifier = await load("fp32");
+        }
       }
       const audio = msg.audio as Float32Array;
-      const input = resample(
-        audio,
-        (msg.samplingRate as number) ?? 16000,
-        16000
+      const input = normalize(
+        resample(audio, (msg.samplingRate as number) ?? 16000, 16000)
       );
       const results = await classifier(input, {
-        top_k: 1,
+        top_k: 5,
         sampling_rate: 16000,
       });
       ctx.postMessage({
         type: "detected",
         id: msg.id,
-        label: results?.[0]?.label ?? "",
+        labels: (results ?? []).map((r) => r.label),
       });
     } catch (err) {
       ctx.postMessage({

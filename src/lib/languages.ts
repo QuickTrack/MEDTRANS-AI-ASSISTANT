@@ -35,15 +35,44 @@ export function floresLang(code: string): string {
   return LANG_BY_CODE[code]?.flores ?? "eng_Latn";
 }
 
-const FLORES_EXACT: Record<string, Language> = Object.fromEntries(
-  LANGUAGES.map((l) => [l.flores.toLowerCase(), l])
-);
-const FLORES_PREFIX: Record<string, Language> = Object.fromEntries(
-  LANGUAGES.map((l) => [l.flores.toLowerCase().split("_")[0], l])
-);
+const ALIAS_LIST: Array<[string, string[]]> = [
+  ["en-US", ["eng_latn", "eng", "en"]],
+  ["fr-FR", ["fra_latn", "fra", "fr", "fre"]],
+  ["es-ES", ["spa_latn", "spa", "es"]],
+  ["de-DE", ["deu_latn", "deu", "de", "ger"]],
+  ["it-IT", ["ita_latn", "ita", "it"]],
+  ["pt-PT", ["por_latn", "por", "pt"]],
+  ["ar-SA", ["arb_arab", "arb", "ar", "ara"]],
+  ["sw-KE", ["swh_latn", "swh", "sw", "swa"]],
+  ["hi-IN", ["hin_deva", "hin", "hi"]],
+  ["ru-RU", ["rus_cyrl", "rus", "ru"]],
+  ["zh-CN", ["zho_hans", "zho", "zh", "chi"]],
+  ["ja-JP", ["jpn_jpan", "jpn", "ja"]],
+  ["nl-NL", ["nld_latn", "nld", "nl", "dut"]],
+  ["tr-TR", ["tur_latn", "tur", "tr"]],
+];
+
+const ALIASES: Record<string, string> = {};
+for (const [code, aliases] of ALIAS_LIST) {
+  for (const a of aliases) ALIASES[a] = code;
+}
 
 export function languageFromFlores(flores: string): Language | null {
-  const code = (flores ?? "").trim().toLowerCase();
-  if (!code) return null;
-  return FLORES_EXACT[code] ?? FLORES_PREFIX[code.split("_")[0]] ?? null;
+  const raw = (flores ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  if (!raw) return null;
+  const byCode = (c: string) => (ALIASES[c] ? LANG_BY_CODE[ALIASES[c]] ?? null : null);
+  return (
+    byCode(raw) ??
+    byCode(raw.replace(/_/g, "")) ??
+    byCode(raw.split("_")[0]) ??
+    null
+  );
+}
+
+export function pickLanguage(labels: string[]): Language | null {
+  for (const l of labels ?? []) {
+    const lang = languageFromFlores(l);
+    if (lang && lang.code !== "auto") return lang;
+  }
+  return null;
 }

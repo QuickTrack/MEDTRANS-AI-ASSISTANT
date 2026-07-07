@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSegments, type FormatOptions, type Segment } from "./format";
-import { languageFromFlores, whisperLang } from "./languages";
+import { pickLanguage, whisperLang } from "./languages";
 
 type ProgressInfo = {
   status: string;
@@ -23,6 +23,12 @@ function appendFloat(target: Float32Array, add: Float32Array, maxLen: number) {
   next.set(add, target.length);
   if (next.length > maxLen) return next.slice(next.length - maxLen);
   return next;
+}
+
+function rms(audio: Float32Array): number {
+  let s = 0;
+  for (let i = 0; i < audio.length; i++) s += audio[i] * audio[i];
+  return Math.sqrt(s / Math.max(1, audio.length));
 }
 
 export function useWhisper(
@@ -63,7 +69,7 @@ export function useWhisper(
   const initResolveRef = useRef<(() => void) | null>(null);
   const initRejectRef = useRef<((e: unknown) => void) | null>(null);
   const resultWaitersRef = useRef(new Map<number, () => void>());
-  const detectWaitersRef = useRef(new Map<number, (label: string) => void>());
+  const detectWaitersRef = useRef(new Map<number, (labels: string[]) => void>());
   const detectReqIdRef = useRef(0);
   const detectingGuardRef = useRef(false);
   const detectedLangRef = useRef<string | null>(null);
@@ -147,7 +153,7 @@ export function useWhisper(
         detectingGuardRef.current = false;
         const cb = detectWaitersRef.current.get(m.id);
         if (cb) {
-          cb((m.label as string) ?? "");
+          cb((m.labels as string[]) ?? []);
           detectWaitersRef.current.delete(m.id);
         }
       } else if (m.type === "result") {
@@ -182,12 +188,12 @@ export function useWhisper(
   }, [finish]);
 
   const runDetect = useCallback(
-    (audio: Float32Array, sr: number): Promise<string> => {
+    (audio: Float32Array, sr: number): Promise<string[]> => {
       const w = ensureWorker();
       setDetecting(true);
       setDetectProgress(0);
       const id = ++detectReqIdRef.current;
-      return new Promise<string>((resolve) => {
+      return new Promise<string[]>((resolve) => {
         detectWaitersRef.current.set(id, resolve);
         w.postMessage({ type: "detect", id, audio, samplingRate: sr }, [
           audio.buffer,
@@ -225,10 +231,11 @@ export function useWhisper(
 
       if (langRef.current === "auto") {
         if (!detectedLangRef.current && !detectingGuardRef.current) {
+          if (rms(windowArr) < 0.004) return; // wait for actual speech
           detectingGuardRef.current = true;
           try {
-            const label = await runDetect(windowArr, sr);
-            const det = languageFromFlores(label);
+            const labels = await runDetect(windowArr, sr);
+            const det = pickLanguage(labels);
             detectedLangRef.current = det ? det.whisper : "";
             detectedCodeRef.current = det ? det.code : "en-US";
           } catch {
@@ -478,8 +485,8 @@ export function useWhisper(
         if (langRef.current === "auto") {
           const detBuf = mono.slice(0, Math.min(mono.length, sr * 30));
           try {
-            const label = await runDetect(detBuf, sr);
-            const det = languageFromFlores(label);
+            const labels = await runDetect(detBuf, sr);
+            const det = pickLanguage(labels);
             detectedLangRef.current = det ? det.whisper : "";
             detectedCodeRef.current = det ? det.code : "en-US";
           } catch {
