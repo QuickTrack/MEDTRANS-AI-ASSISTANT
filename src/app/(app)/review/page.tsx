@@ -6,6 +6,8 @@ import { Topbar } from "@/components/Topbar";
 import { Card, Button, Badge } from "@/components/ui";
 import { IconCheck, IconExport, IconMic } from "@/components/icons";
 import { getJob, updateJob } from "@/lib/jobs";
+import { useTranslate } from "@/lib/translate";
+import { LANGUAGES, floresLang } from "@/lib/languages";
 
 function ReviewInner() {
   const router = useRouter();
@@ -20,7 +22,10 @@ function ReviewInner() {
   const [saved, setSaved] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [targetLang, setTargetLang] = useState("en-US");
+  const [translated, setTranslated] = useState("");
   const loadedRef = useRef<string | null>(null);
+  const translate = useTranslate();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -33,6 +38,8 @@ function ReviewInner() {
     setCursor(0);
     setAudioUrl(job?.audioUrl ?? null);
     setTitle(job?.title ?? "");
+    setTranslated(job?.translation ?? "");
+    setTargetLang(job?.translationLang ?? "en-US");
   }, [jobId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -71,6 +78,19 @@ function ReviewInner() {
   const matches = search
     ? text.toLowerCase().split(search.toLowerCase()).length - 1
     : 0;
+
+  async function handleTranslate() {
+    if (!text.trim() || translate.translating) return;
+    const src = floresLang(
+      getJob(jobId ?? "")?.language ?? "en-US"
+    );
+    const tgt = floresLang(targetLang);
+    const out = await translate.translate(text, src, tgt);
+    if (out) {
+      setTranslated(out);
+      if (jobId) updateJob(jobId, { translation: out, translationLang: targetLang });
+    }
+  }
 
   return (
     <>
@@ -204,6 +224,79 @@ function ReviewInner() {
               <Badge tone="blue" className="mt-3">
                 {jobId ? "Linked to job" : "No job"}
               </Badge>
+            </Card>
+
+            <Card>
+              <p className="font-semibold">Translate</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Run a local NLLB translation model over the reviewed text.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <select
+                  value={targetLang}
+                  onChange={(e) => setTargetLang(e.target.value)}
+                  className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
+                >
+                  {LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  variant="accent"
+                  disabled={translate.translating || !text.trim()}
+                  onClick={handleTranslate}
+                >
+                  {translate.translating
+                    ? translate.loading
+                      ? `Loading ${translate.progress}%`
+                      : "Translating…"
+                    : "Translate"}
+                </Button>
+              </div>
+              {translate.error && (
+                <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">
+                  {translate.error}
+                </p>
+              )}
+              {translate.loading && !translate.translating && (
+                <div className="mt-3">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div
+                      className="h-full rounded-full bg-[#2d7ff9] transition-all"
+                      style={{ width: `${translate.progress}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Downloading translation model ({translate.progress}%) — one-time only
+                  </p>
+                </div>
+              )}
+              {translated && (
+                <div className="mt-3">
+                  <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Translation
+                  </p>
+                  <pre className="scroll-slim max-h-48 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-relaxed dark:bg-slate-800/60">
+                    {translated}
+                  </pre>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => persist(translated)}
+                    >
+                      Replace transcript
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigator.clipboard?.writeText(translated)}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         </div>

@@ -15,14 +15,9 @@ import {
 } from "@/components/icons";
 import { useWhisper } from "@/lib/speech";
 import { addJob } from "@/lib/jobs";
+import { LANGUAGES } from "@/lib/languages";
 
-const LANGS = [
-  { code: "en-US", label: "English" },
-  { code: "fr-FR", label: "French" },
-  { code: "sw-KE", label: "Swahili" },
-  { code: "ar-SA", label: "Arabic" },
-  { code: "de-DE", label: "German" },
-];
+const LANGS = LANGUAGES;
 
 function fmt(sec: number) {
   const s = Math.max(0, Math.round(sec));

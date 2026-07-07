@@ -17,6 +17,8 @@ export type Job = {
   updatedAt: number;
   status: JobStatus;
   words: number;
+  translation?: string;
+  translationLang?: string;
 };
 
 const KEY = "medtrans.jobs";

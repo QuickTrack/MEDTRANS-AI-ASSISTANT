@@ -54,6 +54,7 @@ function ExportInner() {
   const [project, setProject] = useState("Cardiology Q3");
   const [transcript, setTranscript] = useState("");
   const [title, setTitle] = useState("");
+  const [translation, setTranslation] = useState("");
   const [opts, setOpts] = useState({
     footer: true,
     pageNumbers: true,
@@ -71,6 +72,7 @@ function ExportInner() {
     if (job) {
       setTranscript(job.transcript);
       setTitle(job.title);
+      setTranslation(job.translation ?? "");
       if (job.languageLabel) setProject(job.languageLabel);
     }
   }, [jobId]);
@@ -112,6 +114,16 @@ function ExportInner() {
               {transcript ||
                 "No transcript loaded. Record and review a session first."}
             </pre>
+            {translation && (
+              <div className="mt-4">
+                <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Translation
+                </p>
+                <pre className="scroll-slim max-h-[40vh] overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-relaxed dark:bg-slate-800/60">
+                  {translation}
+                </pre>
+              </div>
+            )}
           </Card>
 
           <div className="space-y-4">

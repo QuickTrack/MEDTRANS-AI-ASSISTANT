@@ -46,9 +46,9 @@ export default function SettingsPage() {
               </span>
               <Toggle checked={noise} onChange={setNoise} />
             </label>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Model: Faster-Whisper large-v3 (FR / EN / SW)
-            </p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Whisper (14 languages) + NLLB-200 translation
+              </p>
           </Card>
 
           <Card>

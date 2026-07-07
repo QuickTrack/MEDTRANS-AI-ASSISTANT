@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSegments, type FormatOptions, type Segment } from "./format";
+import { whisperLang } from "./languages";
 
 type ProgressInfo = {
   status: string;
@@ -11,14 +12,6 @@ type ProgressInfo = {
 };
 
 const MODEL = "Xenova/whisper-base";
-
-const LANG_NAME: Record<string, string> = {
-  "en-US": "english",
-  "fr-FR": "french",
-  "sw-KE": "swahili",
-  "ar-SA": "arabic",
-  "de-DE": "german",
-};
 
 const WINDOW_MS = 6000;
 const OVERLAP_MS = 1500;
@@ -192,7 +185,7 @@ export function useWhisper(
           id,
           audio: windowArr,
           samplingRate: sr,
-          language: LANG_NAME[langRef.current] ?? "english",
+          language: whisperLang(langRef.current),
         },
         [windowArr.buffer]
       );
@@ -420,7 +413,7 @@ export function useWhisper(
               id,
               audio: seg,
               samplingRate: sr,
-              language: LANG_NAME[langRef.current] ?? "english",
+              language: whisperLang(langRef.current),
             },
             [seg.buffer]
           );
