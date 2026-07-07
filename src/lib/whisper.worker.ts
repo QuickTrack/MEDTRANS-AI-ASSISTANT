@@ -15,6 +15,16 @@ type ProgressInfo = {
 
 let transcriber: AutomaticSpeechRecognitionPipeline | null = null;
 
+type LangIdResult = { label: string; score: number };
+type LangIdPipeline = (
+  audio: Float32Array | string,
+  opts?: { top_k?: number; sampling_rate?: number }
+) => Promise<LangIdResult[]>;
+
+let classifier: LangIdPipeline | null = null;
+
+const LANG_ID_MODEL = "Xenova/w2v-bert-2.0-lang-id";
+
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
 const envLike = env as unknown as {
@@ -59,6 +69,53 @@ ctx.onmessage = async (e: MessageEvent) => {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       ctx.postMessage({ type: "error", message });
+    }
+    return;
+  }
+
+  if (msg.type === "detect") {
+    try {
+      if (!classifier) {
+        classifier = (await pipeline(
+          "audio-classification",
+          LANG_ID_MODEL,
+          {
+            dtype: "q8",
+            device: "wasm",
+            progress_callback: (p: ProgressInfo) => {
+              if (p.status === "progress" && p.total) {
+                ctx.postMessage({
+                  type: "detectProgress",
+                  loaded: p.loaded ?? 0,
+                  total: p.total,
+                });
+              }
+            },
+          }
+        )) as unknown as LangIdPipeline;
+      }
+      const audio = msg.audio as Float32Array;
+      const input = resample(
+        audio,
+        (msg.samplingRate as number) ?? 16000,
+        16000
+      );
+      const results = await classifier(input, {
+        top_k: 1,
+        sampling_rate: 16000,
+      });
+      ctx.postMessage({
+        type: "detected",
+        id: msg.id,
+        label: results?.[0]?.label ?? "",
+      });
+    } catch (err) {
+      ctx.postMessage({
+        type: "detected",
+        id: msg.id,
+        label: "",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     return;
   }

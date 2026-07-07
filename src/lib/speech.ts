@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSegments, type FormatOptions, type Segment } from "./format";
-import { whisperLang } from "./languages";
+import { languageFromFlores, whisperLang } from "./languages";
 
 type ProgressInfo = {
   status: string;
@@ -31,7 +31,8 @@ export function useWhisper(
     text: string,
     audioUrl: string | null,
     sizeBytes: number,
-    durationSec?: number
+    durationSec?: number,
+    detectedLang?: string
   ) => void,
   formatOpts?: FormatOptions
 ) {
@@ -45,6 +46,8 @@ export function useWhisper(
   const [fileTranscribing, setFileTranscribing] = useState(false);
   const [fileProgress, setFileProgress] = useState(0);
   const [level, setLevel] = useState(0);
+  const [detecting, setDetecting] = useState(false);
+  const [detectProgress, setDetectProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
@@ -60,6 +63,11 @@ export function useWhisper(
   const initResolveRef = useRef<(() => void) | null>(null);
   const initRejectRef = useRef<((e: unknown) => void) | null>(null);
   const resultWaitersRef = useRef(new Map<number, () => void>());
+  const detectWaitersRef = useRef(new Map<number, (label: string) => void>());
+  const detectReqIdRef = useRef(0);
+  const detectingGuardRef = useRef(false);
+  const detectedLangRef = useRef<string | null>(null);
+  const detectedCodeRef = useRef<string | null>(null);
   const finishedRef = useRef(false);
 
   const segmentsRef = useRef<Segment[]>([]);
@@ -92,11 +100,16 @@ export function useWhisper(
     const text = opts
       ? formatSegments(segmentsRef.current, opts)
       : segmentsRef.current.map((s) => s.text.trim()).join(" ").trim();
+    const detected =
+      langRef.current === "auto"
+        ? detectedCodeRef.current ?? undefined
+        : langRef.current;
     onCompleteRef.current(
       text,
       audioUrlRef.current,
       sizeRef.current,
-      durationRef.current
+      durationRef.current,
+      detected
     );
   }, []);
 
@@ -124,6 +137,19 @@ export function useWhisper(
         setLoading(false);
         initRejectRef.current?.(new Error(m.message ?? "unknown error"));
         initRejectRef.current = null;
+      } else if (m.type === "detectProgress") {
+        const p = m as ProgressInfo;
+        if (p.status === "progress" && p.total) {
+          setDetectProgress(Math.round(((p.loaded ?? 0) / p.total) * 100));
+        }
+      } else if (m.type === "detected") {
+        setDetecting(false);
+        detectingGuardRef.current = false;
+        const cb = detectWaitersRef.current.get(m.id);
+        if (cb) {
+          cb((m.label as string) ?? "");
+          detectWaitersRef.current.delete(m.id);
+        }
       } else if (m.type === "result") {
         inflightRef.current = false;
         setTranscribing(false);
@@ -155,8 +181,31 @@ export function useWhisper(
     return w;
   }, [finish]);
 
+  const runDetect = useCallback(
+    (audio: Float32Array, sr: number): Promise<string> => {
+      const w = ensureWorker();
+      setDetecting(true);
+      setDetectProgress(0);
+      const id = ++detectReqIdRef.current;
+      return new Promise<string>((resolve) => {
+        detectWaitersRef.current.set(id, resolve);
+        w.postMessage({ type: "detect", id, audio, samplingRate: sr }, [
+          audio.buffer,
+        ]);
+      });
+    },
+    [ensureWorker]
+  );
+
+  const detectLang = useCallback((): string => {
+    if (langRef.current === "auto") {
+      return detectedLangRef.current ?? whisperLang(langRef.current);
+    }
+    return whisperLang(langRef.current);
+  }, []);
+
   const sendWindow = useCallback(
-    (final: boolean) => {
+    async (final: boolean) => {
       const buf = audioRef.current;
       const ctx = ctxRef.current;
       if (!ctx || !buf || buf.length <= processedUntilRef.current) {
@@ -173,6 +222,25 @@ export function useWhisper(
       );
       const startIdx = Math.max(0, processedUntilRef.current - overlap);
       const windowArr = buf.slice(startIdx, buf.length);
+
+      if (langRef.current === "auto") {
+        if (!detectedLangRef.current && !detectingGuardRef.current) {
+          detectingGuardRef.current = true;
+          try {
+            const label = await runDetect(windowArr, sr);
+            const det = languageFromFlores(label);
+            detectedLangRef.current = det ? det.whisper : "";
+            detectedCodeRef.current = det ? det.code : "en-US";
+          } catch {
+            detectedLangRef.current = "";
+            detectedCodeRef.current = "en-US";
+          }
+        } else if (detectingGuardRef.current) {
+          // detection still in flight for the first window — skip this one
+          return;
+        }
+      }
+
       const id = ++reqIdRef.current;
       inflightRef.current = true;
       if (final) finalReqIdRef.current = id;
@@ -185,12 +253,12 @@ export function useWhisper(
           id,
           audio: windowArr,
           samplingRate: sr,
-          language: whisperLang(langRef.current) || undefined,
+          language: detectLang() || undefined,
         },
         [windowArr.buffer]
       );
     },
-    [ensureWorker, finish]
+    [ensureWorker, finish, runDetect, detectLang]
   );
 
   const loadModel = useCallback(() => {
@@ -294,11 +362,16 @@ export function useWhisper(
       finalReqIdRef.current = null;
       canFinishRef.current = false;
       finishedRef.current = false;
+      detectingGuardRef.current = false;
+      detectedLangRef.current = null;
+      detectedCodeRef.current = null;
       audioUrlRef.current = null;
       sizeRef.current = 0;
       setFinalText("");
       setInterimText("");
       setProgress(0);
+      setDetecting(false);
+      setDetectProgress(0);
 
       listeningRef.current = true;
       setListening(true);
@@ -364,6 +437,11 @@ export function useWhisper(
       finalReqIdRef.current = null;
       canFinishRef.current = true;
       finishedRef.current = false;
+      detectingGuardRef.current = false;
+      detectedLangRef.current = null;
+      detectedCodeRef.current = null;
+      setDetecting(false);
+      setDetectProgress(0);
       audioUrlRef.current = URL.createObjectURL(file);
       sizeRef.current = file.size;
 
@@ -397,6 +475,19 @@ export function useWhisper(
         }
         if (windows.length === 0) windows.push({ start: 0, end: total });
 
+        if (langRef.current === "auto") {
+          const detBuf = mono.slice(0, Math.min(mono.length, sr * 30));
+          try {
+            const label = await runDetect(detBuf, sr);
+            const det = languageFromFlores(label);
+            detectedLangRef.current = det ? det.whisper : "";
+            detectedCodeRef.current = det ? det.code : "en-US";
+          } catch {
+            detectedLangRef.current = "";
+            detectedCodeRef.current = "en-US";
+          }
+        }
+
         for (let i = 0; i < windows.length; i++) {
           const seg = mono.slice(windows[i].start, windows[i].end);
           const id = ++reqIdRef.current;
@@ -413,7 +504,7 @@ export function useWhisper(
               id,
               audio: seg,
               samplingRate: sr,
-              language: whisperLang(langRef.current) || undefined,
+              language: detectLang() || undefined,
             },
             [seg.buffer]
           );
@@ -433,7 +524,7 @@ export function useWhisper(
         }
       }
     },
-    [loadModel, ensureWorker, finish, fileTranscribing]
+    [loadModel, ensureWorker, finish, runDetect, detectLang, fileTranscribing]
   );
 
   useEffect(() => {
@@ -459,6 +550,8 @@ export function useWhisper(
     interimText,
     level,
     error,
+    detecting,
+    detectProgress,
     transcribing,
     fileTranscribing,
     fileProgress,

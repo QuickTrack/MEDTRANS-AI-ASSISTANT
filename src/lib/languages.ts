@@ -34,3 +34,16 @@ export function whisperLang(code: string): string {
 export function floresLang(code: string): string {
   return LANG_BY_CODE[code]?.flores ?? "eng_Latn";
 }
+
+const FLORES_EXACT: Record<string, Language> = Object.fromEntries(
+  LANGUAGES.map((l) => [l.flores.toLowerCase(), l])
+);
+const FLORES_PREFIX: Record<string, Language> = Object.fromEntries(
+  LANGUAGES.map((l) => [l.flores.toLowerCase().split("_")[0], l])
+);
+
+export function languageFromFlores(flores: string): Language | null {
+  const code = (flores ?? "").trim().toLowerCase();
+  if (!code) return null;
+  return FLORES_EXACT[code] ?? FLORES_PREFIX[code.split("_")[0]] ?? null;
+}

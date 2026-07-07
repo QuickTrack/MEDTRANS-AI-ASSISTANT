@@ -47,8 +47,12 @@ export default function TranscribePage() {
     text: string,
     audioUrl: string | null,
     sizeBytes: number,
-    durationSec?: number
+    durationSec?: number,
+    detectedLang?: string
   ) {
+    const langCode = detectedLang ?? lang;
+    const langName =
+      LANGS.find((l) => l.code === langCode)?.label ?? langCode;
     const job = addJob({
       id:
         typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -57,8 +61,8 @@ export default function TranscribePage() {
       title: file?.name ?? `Recording ${new Date().toLocaleString()}`,
       transcript: text,
       durationSec: Math.round(durationSec ?? elapsedRef.current),
-      language: lang,
-      languageLabel: langLabel,
+      language: langCode,
+      languageLabel: langName,
       audioUrl: audioUrl ?? fileUrlRef.current,
       sizeBytes: sizeBytes || fileSizeRef.current,
       createdAt: Date.now(),
@@ -67,8 +71,8 @@ export default function TranscribePage() {
     setDone(true);
   }
 
-  const speech = useWhisper(lang, (text, url, size) => {
-    finalize(text, url, size);
+  const speech = useWhisper(lang, (text, url, size, _dur, detectedLang) => {
+    finalize(text, url, size, undefined, detectedLang);
   });
 
   useEffect(() => {
@@ -320,6 +324,10 @@ export default function TranscribePage() {
                     <span className="text-slate-400">{speech.interimText}</span>
                   )}
                 </>
+              ) : speech.detecting ? (
+                <p className="text-slate-400">
+                  Detecting language… {speech.detectProgress}%
+                </p>
               ) : (
                 <p className="text-slate-400">
                   {live
