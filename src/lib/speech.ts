@@ -39,7 +39,8 @@ export function useWhisper(
     audioUrl: string | null,
     sizeBytes: number,
     durationSec?: number
-  ) => void
+  ) => void,
+  formatOpts?: FormatOptions
 ) {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
@@ -56,7 +57,6 @@ export function useWhisper(
   const workerRef = useRef<Worker | null>(null);
   const reqIdRef = useRef(0);
   const inflightRef = useRef(false);
-  const committedRef = useRef("");
   const processedUntilRef = useRef(0);
   const finalReqIdRef = useRef<number | null>(null);
   const canFinishRef = useRef(false);
@@ -68,6 +68,13 @@ export function useWhisper(
   const initRejectRef = useRef<((e: unknown) => void) | null>(null);
   const resultWaitersRef = useRef(new Map<number, () => void>());
   const finishedRef = useRef(false);
+
+  const segmentsRef = useRef<Segment[]>([]);
+  const segTimesRef = useRef(new Map<number, { start?: number; end?: number }>());
+  const formatOptsRef = useRef<FormatOptions | undefined>(formatOpts);
+  useEffect(() => {
+    formatOptsRef.current = formatOpts;
+  }, [formatOpts]);
 
   const streamRef = useRef<MediaStream | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
@@ -88,8 +95,12 @@ export function useWhisper(
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    const opts = formatOptsRef.current;
+    const text = opts
+      ? formatSegments(segmentsRef.current, opts)
+      : segmentsRef.current.map((s) => s.text.trim()).join(" ").trim();
     onCompleteRef.current(
-      committedRef.current,
+      text,
       audioUrlRef.current,
       sizeRef.current,
       durationRef.current
@@ -125,10 +136,19 @@ export function useWhisper(
         setTranscribing(false);
         const text = (m.text ?? "").trim();
         if (text) {
-          committedRef.current = committedRef.current
-            ? committedRef.current + " " + text
-            : text;
-          setFinalText(committedRef.current);
+          const times = segTimesRef.current.get(m.id);
+          segTimesRef.current.delete(m.id);
+          segmentsRef.current.push({
+            start: times?.start,
+            end: times?.end,
+            text,
+          });
+          const opts = formatOptsRef.current;
+          setFinalText(
+            opts
+              ? formatSegments(segmentsRef.current, opts)
+              : segmentsRef.current.map((s) => s.text.trim()).join(" ").trim()
+          );
         }
         resultWaitersRef.current.get(m.id)?.();
         resultWaitersRef.current.delete(m.id);
@@ -275,7 +295,8 @@ export function useWhisper(
       procRef.current = proc;
 
       audioRef.current = new Float32Array(0);
-      committedRef.current = "";
+      segmentsRef.current = [];
+      segTimesRef.current = new Map();
       processedUntilRef.current = 0;
       finalReqIdRef.current = null;
       canFinishRef.current = false;
@@ -345,7 +366,8 @@ export function useWhisper(
       setFileProgress(0);
       setFinalText("");
       setInterimText("");
-      committedRef.current = "";
+      segmentsRef.current = [];
+      segTimesRef.current = new Map();
       finalReqIdRef.current = null;
       canFinishRef.current = true;
       finishedRef.current = false;
@@ -385,6 +407,10 @@ export function useWhisper(
         for (let i = 0; i < windows.length; i++) {
           const seg = mono.slice(windows[i].start, windows[i].end);
           const id = ++reqIdRef.current;
+          segTimesRef.current.set(id, {
+            start: windows[i].start / sr,
+            end: windows[i].end / sr,
+          });
           inflightRef.current = true;
           if (i === windows.length - 1) finalReqIdRef.current = id;
           setTranscribing(true);
