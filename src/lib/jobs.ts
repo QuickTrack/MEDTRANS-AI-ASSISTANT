@@ -19,10 +19,12 @@ export type Job = {
   words: number;
   translation?: string;
   translationLang?: string;
+  speakers?: number;
 };
 
 const KEY = "medtrans.jobs";
 const EVENT = "medtrans:jobs";
+const LAST_JOB_KEY = "medtrans.lastJobId";
 
 function read(): Job[] {
   try {
@@ -44,12 +46,31 @@ function write(jobs: Job[]) {
   }
 }
 
+export function getLastJobId(): string | null {
+  try {
+    return localStorage.getItem(LAST_JOB_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setLastJobId(id: string | null) {
+  try {
+    if (id) localStorage.setItem(LAST_JOB_KEY, id);
+    else localStorage.removeItem(LAST_JOB_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 function countWords(text: string) {
   const t = text.trim();
   return t ? t.split(/\s+/).length : 0;
 }
 
-export function addJob(input: Omit<Job, "words" | "updatedAt" | "status">): Job {
+export function addJob(
+  input: Omit<Job, "words" | "updatedAt" | "status">
+): Job {
   const job: Job = {
     ...input,
     words: countWords(input.transcript),
@@ -57,6 +78,7 @@ export function addJob(input: Omit<Job, "words" | "updatedAt" | "status">): Job 
     updatedAt: Date.now(),
   };
   write([job, ...read()]);
+  setLastJobId(job.id);
   return job;
 }
 

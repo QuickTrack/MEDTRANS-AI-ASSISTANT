@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Card, Button, Badge, Toggle } from "@/components/ui";
 import { IconExport, IconCheck } from "@/components/icons";
-import { getJob, updateJob } from "@/lib/jobs";
+import { getJob, getLastJobId, updateJob } from "@/lib/jobs";
 
 const FORMATS = [
   { id: "docx", label: "Word (.docx)" },
@@ -66,9 +66,10 @@ function ExportInner() {
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!jobId || loadedRef.current === jobId) return;
-    const job = getJob(jobId);
-    loadedRef.current = jobId;
+    const effectiveJobId = jobId || getLastJobId();
+    if (!effectiveJobId || loadedRef.current === effectiveJobId) return;
+    const job = getJob(effectiveJobId);
+    loadedRef.current = effectiveJobId;
     if (job) {
       setTranscript(job.transcript);
       setTitle(job.title);

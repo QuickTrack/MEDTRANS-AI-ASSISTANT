@@ -3,8 +3,9 @@
 import { Topbar } from "@/components/Topbar";
 import { Card, Button, Toggle, Badge } from "@/components/ui";
 import { useTheme } from "@/lib/theme";
-import { IconShield, IconBolt, IconMic, IconCheck } from "@/components/icons";
+import { IconShield, IconBolt, IconMic, IconCheck, IconUsers } from "@/components/icons";
 import { useState } from "react";
+import { getSpeakerPref, setSpeakerPref } from "@/lib/prefs";
 
 export default function SettingsPage() {
   const { dark, toggle } = useTheme();
@@ -12,6 +13,7 @@ export default function SettingsPage() {
   const [gpu, setGpu] = useState(true);
   const [noise, setNoise] = useState(true);
   const [notif, setNotif] = useState(true);
+  const [speakers, setSpeakers] = useState(getSpeakerPref());
   const [langs, setLangs] = useState(["English", "French", "Swahili"]);
 
   const allLangs = ["English", "French", "Swahili", "Arabic", "German"];
@@ -49,6 +51,27 @@ export default function SettingsPage() {
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 Whisper (14 languages) + NLLB-200 translation
               </p>
+          </Card>
+
+          <Card>
+            <p className="font-semibold">Intelligence</p>
+            <label className="mt-3 flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <IconUsers width={16} height={16} className="text-[#2d7ff9]" />
+                Speaker recognition
+              </span>
+              <Toggle
+                checked={speakers}
+                onChange={(v) => {
+                  setSpeakers(v);
+                  setSpeakerPref(v);
+                }}
+              />
+            </label>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Label each turn (Speaker A / B) using an on-device voice
+              embedding model. Defaults to on for new recordings.
+            </p>
           </Card>
 
           <Card>

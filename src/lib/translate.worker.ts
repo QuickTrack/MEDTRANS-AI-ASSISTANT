@@ -31,6 +31,9 @@ ctx.onmessage = async (e: MessageEvent) => {
       translator = (await pipeline("translation", MODEL, {
         dtype: ((msg.dtype as string) ?? "q8") as "q8",
         device: ((msg.device as string) ?? "wasm") as "wasm",
+        // Skip layout optimizations: the bundled onnxruntime-web dev build fails in
+        // TransposeDQWeightsForMatMulNBits on the dynamically-fused quantized weights.
+        session_options: { graphOptimizationLevel: "basic" },
         progress_callback: (p: ProgressLike) => {
           if (p.status === "progress" && p.total) {
             ctx.postMessage({ type: "progress", loaded: p.loaded ?? 0, total: p.total });

@@ -125,6 +125,14 @@ export const IconClock = (p: P) => (
   </svg>
 );
 
+export const IconUsers = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" />
+  </svg>
+);
+
 export const IconShield = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" />

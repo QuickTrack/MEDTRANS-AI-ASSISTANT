@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSegments, type FormatOptions, type Segment } from "./format";
 import { pickLanguage, whisperLang } from "./languages";
+import { SpeakerRecognizer, type SpeakerStatus } from "./speaker";
 
 type ProgressInfo = {
   status: string;
@@ -56,6 +57,12 @@ export function useWhisper(
   const [detectProgress, setDetectProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  const [speakerEnabled, setSpeakerEnabledState] = useState(false);
+  const [speakerLoading, setSpeakerLoading] = useState(false);
+  const [speakerReady, setSpeakerReady] = useState(false);
+  const [speakerProgress, setSpeakerProgress] = useState(0);
+  const [speakerError, setSpeakerError] = useState<string | null>(null);
+
   const workerRef = useRef<Worker | null>(null);
   const reqIdRef = useRef(0);
   const inflightRef = useRef(false);
@@ -75,6 +82,11 @@ export function useWhisper(
   const detectedLangRef = useRef<string | null>(null);
   const detectedCodeRef = useRef<string | null>(null);
   const finishedRef = useRef(false);
+
+  const speakerRef = useRef<SpeakerRecognizer | null>(null);
+  const speakerEnabledRef = useRef(false);
+  const segIndexByReqRef = useRef(new Map<number, number>());
+  const speakerByReqRef = useRef(new Map<number, string>());
 
   const segmentsRef = useRef<Segment[]>([]);
   const segTimesRef = useRef(new Map<number, { start?: number; end?: number }>());
@@ -99,13 +111,35 @@ export function useWhisper(
     onCompleteRef.current = onComplete;
   });
 
+  const applyText = useCallback(() => {
+    const segs = segmentsRef.current;
+    const hasSpeakers = segs.some((s) => s.speaker);
+    if (hasSpeakers) {
+      setFinalText(
+        formatSegments(segs, {
+          enabled: true,
+          style: "full",
+          timestamps: false,
+          nonVerbal: true,
+          speakers: [],
+          autoSpeakers: false,
+        })
+      );
+    } else {
+      setFinalText(segs.map((s) => s.text.trim()).join(" ").trim());
+    }
+  }, []);
+
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
-    const opts = formatOptsRef.current;
-    const text = opts
-      ? formatSegments(segmentsRef.current, opts)
-      : segmentsRef.current.map((s) => s.text.trim()).join(" ").trim();
+    const text = segmentsRef.current
+      .map((s) => {
+        if (s.speaker) return `${s.speaker}: ${s.text.trim()}`;
+        return s.text.trim();
+      })
+      .join("\n\n")
+      .trim();
     const detected =
       langRef.current === "auto"
         ? detectedCodeRef.current ?? undefined
@@ -163,17 +197,15 @@ export function useWhisper(
         if (text) {
           const times = segTimesRef.current.get(m.id);
           segTimesRef.current.delete(m.id);
+          const speaker = speakerByReqRef.current.get(m.id);
           segmentsRef.current.push({
             start: times?.start,
             end: times?.end,
             text,
+            speaker,
           });
-          const opts = formatOptsRef.current;
-          setFinalText(
-            opts
-              ? formatSegments(segmentsRef.current, opts)
-              : segmentsRef.current.map((s) => s.text.trim()).join(" ").trim()
-          );
+          segIndexByReqRef.current.set(m.id, segmentsRef.current.length - 1);
+          applyText();
         }
         resultWaitersRef.current.get(m.id)?.();
         resultWaitersRef.current.delete(m.id);
@@ -185,7 +217,7 @@ export function useWhisper(
     };
     workerRef.current = w;
     return w;
-  }, [finish]);
+  }, [finish, applyText]);
 
   const runDetect = useCallback(
     (audio: Float32Array, sr: number): Promise<string[]> => {
@@ -203,12 +235,60 @@ export function useWhisper(
     [ensureWorker]
   );
 
-  const detectLang = useCallback((): string => {
-    if (langRef.current === "auto") {
-      return detectedLangRef.current ?? whisperLang(langRef.current);
+  const detectLang = useCallback((override?: string): string => {
+    const effective = override ?? langRef.current;
+    if (effective === "auto") {
+      return detectedLangRef.current || whisperLang(effective);
     }
-    return whisperLang(langRef.current);
+    return whisperLang(effective);
   }, []);
+
+  const applySpeaker = useCallback((id: number, label: string) => {
+    const idx = segIndexByReqRef.current.get(id);
+    if (idx != null && segmentsRef.current[idx]) {
+      segmentsRef.current[idx].speaker = label;
+      applyText();
+    } else {
+      speakerByReqRef.current.set(id, label);
+    }
+  }, [applyText]);
+
+  const ensureSpeaker = useCallback(async (): Promise<boolean> => {
+    if (!speakerEnabledRef.current) return false;
+    if (!speakerRef.current) {
+      const rec = new SpeakerRecognizer();
+      rec.onStatus = (s: SpeakerStatus) => {
+        setSpeakerLoading(s.loading);
+        setSpeakerReady(s.ready);
+        setSpeakerProgress(s.progress);
+        setSpeakerError(s.error);
+      };
+      speakerRef.current = rec;
+    }
+    if (speakerRef.current.ready) return true;
+    setSpeakerLoading(true);
+    setSpeakerError(null);
+    setSpeakerProgress(0);
+    try {
+      await speakerRef.current.init();
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSpeakerError("Speaker model failed to load: " + msg);
+      setSpeakerLoading(false);
+      return false;
+    }
+  }, []);
+
+  const setSpeakers = useCallback((enabled: boolean) => {
+    speakerEnabledRef.current = enabled;
+    setSpeakerEnabledState(enabled);
+    if (enabled) {
+      ensureSpeaker();
+    } else {
+      setSpeakerError(null);
+    }
+  }, [ensureSpeaker]);
 
   const sendWindow = useCallback(
     async (final: boolean) => {
@@ -264,8 +344,16 @@ export function useWhisper(
         },
         [windowArr.buffer]
       );
+      if (speakerEnabledRef.current && speakerRef.current?.ready) {
+        speakerRef.current
+          .recognize(windowArr, sr)
+          .then((label) => {
+            if (label) applySpeaker(id, label);
+          })
+          .catch(() => undefined);
+      }
     },
-    [ensureWorker, finish, runDetect, detectLang]
+    [ensureWorker, finish, runDetect, detectLang, applySpeaker]
   );
 
   const loadModel = useCallback(() => {
@@ -295,6 +383,14 @@ export function useWhisper(
       setError("Model not ready — cannot start transcription.");
       return;
     }
+    if (speakerEnabledRef.current) {
+      try {
+        await ensureSpeaker();
+      } catch {
+        /* continue without speakers */
+      }
+    }
+    speakerRef.current?.reset();
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -391,7 +487,7 @@ export function useWhisper(
       setListening(false);
       listeningRef.current = false;
     }
-  }, [loadModel, sendWindow, finish]);
+  }, [loadModel, sendWindow, finish, ensureSpeaker]);
 
   const stop = useCallback(() => {
     if (!listeningRef.current) return;
@@ -421,7 +517,7 @@ export function useWhisper(
   }, [sendWindow, finish]);
 
   const transcribeFile = useCallback(
-    async (file: File) => {
+    async (file: File, langOverride?: string) => {
       if (listeningRef.current || fileTranscribing) return;
       try {
         await loadModel();
@@ -434,6 +530,14 @@ export function useWhisper(
         setError("Model not ready — cannot start transcription.");
         return;
       }
+      if (speakerEnabledRef.current) {
+        try {
+          await ensureSpeaker();
+        } catch {
+          /* continue without speakers */
+        }
+      }
+      speakerRef.current?.reset();
       setError(null);
       setFileTranscribing(true);
       setFileProgress(0);
@@ -482,7 +586,7 @@ export function useWhisper(
         }
         if (windows.length === 0) windows.push({ start: 0, end: total });
 
-        if (langRef.current === "auto") {
+        if ((langOverride ?? langRef.current) === "auto") {
           const detBuf = mono.slice(0, Math.min(mono.length, sr * 30));
           try {
             const labels = await runDetect(detBuf, sr);
@@ -502,6 +606,11 @@ export function useWhisper(
             start: windows[i].start / sr,
             end: windows[i].end / sr,
           });
+          const label =
+            speakerEnabledRef.current && speakerRef.current?.ready
+              ? await speakerRef.current.recognize(seg, sr)
+              : "";
+          speakerByReqRef.current.set(id, label);
           inflightRef.current = true;
           if (i === windows.length - 1) finalReqIdRef.current = id;
           setTranscribing(true);
@@ -511,7 +620,7 @@ export function useWhisper(
               id,
               audio: seg,
               samplingRate: sr,
-              language: detectLang() || undefined,
+              language: detectLang(langOverride) || undefined,
             },
             [seg.buffer]
           );
@@ -531,7 +640,7 @@ export function useWhisper(
         }
       }
     },
-    [loadModel, ensureWorker, finish, runDetect, detectLang, fileTranscribing]
+    [loadModel, ensureWorker, finish, runDetect, detectLang, ensureSpeaker, fileTranscribing]
   );
 
   useEffect(() => {
@@ -544,6 +653,7 @@ export function useWhisper(
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       workerRef.current?.terminate();
       workerRef.current = null;
+      speakerRef.current = null;
     };
   }, []);
 
@@ -562,6 +672,12 @@ export function useWhisper(
     transcribing,
     fileTranscribing,
     fileProgress,
+    speakerEnabled,
+    speakerLoading,
+    speakerReady,
+    speakerProgress,
+    speakerError,
+    setSpeakers,
     start,
     stop,
     transcribeFile,

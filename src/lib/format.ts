@@ -11,6 +11,7 @@ export type Segment = {
   start?: number;
   end?: number;
   text: string;
+  speaker?: string;
 };
 
 const FILLERS = new Set([
@@ -72,18 +73,21 @@ export function formatSegments(segments: Segment[], opts: FormatOptions): string
     if (!opts.nonVerbal) t = stripCues(t);
     if (!t) continue;
 
-    if (opts.autoSpeakers && labels.length > 1 && prevEnd != null && seg.start != null) {
-      if (seg.start - prevEnd > 1.2) {
-        speakerIdx = (speakerIdx + 1) % labels.length;
+    let label = seg.speaker ?? "";
+    if (!label) {
+      if (opts.autoSpeakers && labels.length > 1 && prevEnd != null && seg.start != null) {
+        if (seg.start - prevEnd > 1.2) {
+          speakerIdx = (speakerIdx + 1) % labels.length;
+        }
       }
+      label = labels[speakerIdx % labels.length];
     }
 
-    const label = labels[speakerIdx % labels.length];
     const ts =
       opts.timestamps && seg.start != null
         ? `[${fmtTime(seg.start)}] `
         : "";
-    out.push(`${label}: ${ts}${t}`);
+    out.push(label ? `${label}: ${ts}${t}` : `${ts}${t}`);
 
     if (seg.end != null) prevEnd = seg.end;
   }

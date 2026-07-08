@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
-import { Card, Button, Badge } from "@/components/ui";
+import { Card, Button, Badge, Toggle } from "@/components/ui";
 import {
   IconUpload,
   IconMic,
@@ -12,10 +12,12 @@ import {
   IconBolt,
   IconCheck,
   IconClock,
+  IconUsers,
 } from "@/components/icons";
 import { useWhisper } from "@/lib/speech";
 import { addJob } from "@/lib/jobs";
 import { LANGUAGES } from "@/lib/languages";
+import { getSpeakerPref, setSpeakerPref } from "@/lib/prefs";
 
 const LANGS = LANGUAGES;
 
@@ -33,10 +35,19 @@ export default function TranscribePage() {
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileDuration, setFileDuration] = useState("");
+  const [fileLang, setFileLang] = useState("auto");
 
   const [elapsed, setElapsed] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  const [speakers, setSpeakers] = useState(getSpeakerPref());
+
+  function toggleSpeakers() {
+    const next = !speakers;
+    setSpeakers(next);
+    setSpeakerPref(next);
+  }
 
   const elapsedRef = useRef(0);
   const fileUrlRef = useRef<string | null>(null);
@@ -53,6 +64,10 @@ export default function TranscribePage() {
     const langCode = detectedLang ?? lang;
     const langName =
       LANGS.find((l) => l.code === langCode)?.label ?? langCode;
+    const speakerSet = new Set<string>();
+    for (const m of text.matchAll(/^Speaker ([A-Z]|\d+):/gm)) {
+      speakerSet.add(m[0]);
+    }
     const job = addJob({
       id:
         typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -65,6 +80,7 @@ export default function TranscribePage() {
       languageLabel: langName,
       audioUrl: audioUrl ?? fileUrlRef.current,
       sizeBytes: sizeBytes || fileSizeRef.current,
+      speakers: speakerSet.size || undefined,
       createdAt: Date.now(),
     });
     setJobId(job.id);
@@ -74,6 +90,10 @@ export default function TranscribePage() {
   const speech = useWhisper(lang, (text, url, size, _dur, detectedLang) => {
     finalize(text, url, size, undefined, detectedLang);
   });
+
+  useEffect(() => {
+    speech.setSpeakers(speakers);
+  }, [speakers, speech]);
 
   useEffect(() => {
     elapsedRef.current = elapsed;
@@ -88,6 +108,7 @@ export default function TranscribePage() {
     setFile(f);
     setDone(false);
     setJobId(null);
+    setFileLang(lang);
     const url = URL.createObjectURL(f);
     setFileUrl(url);
     fileSizeRef.current = f.size;
@@ -146,6 +167,38 @@ export default function TranscribePage() {
               offline in your browser (microphone). Downloads once, then works
               without any server.
             </p>
+
+            <label className="mt-3 flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <IconUsers width={16} height={16} className="text-[#2d7ff9]" />
+                Speaker recognition
+              </span>
+              <Toggle checked={speakers} onChange={toggleSpeakers} />
+            </label>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Labels each turn as Speaker A / B using an on-device voice
+              embedding model (no audio leaves this device).
+            </p>
+
+            {speech.speakerLoading && (
+              <div className="mt-3">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                  <div
+                    className="h-full rounded-full bg-[#2d7ff9] transition-all"
+                    style={{ width: `${speech.speakerProgress}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  Downloading speaker model ({speech.speakerProgress}%) —
+                  one-time only
+                </p>
+              </div>
+            )}
+            {speech.speakerError && (
+              <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">
+                {speech.speakerError}
+              </p>
+            )}
 
             <div className="mt-4 flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-300 py-8 text-center dark:border-slate-700">
               <div
@@ -275,11 +328,27 @@ export default function TranscribePage() {
                     <IconPlay width={16} height={16} />
                   </button>
                 </div>
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Audio language (used for this file)
+                  </label>
+                  <select
+                    value={fileLang}
+                    onChange={(e) => setFileLang(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
+                  >
+                    {LANGS.map((l) => (
+                      <option key={l.code} value={l.code}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="mt-3 flex gap-2">
                   <Button
                     variant="brand"
                     disabled={live || speech.fileTranscribing || speech.loading}
-                    onClick={() => file && speech.transcribeFile(file)}
+                    onClick={() => file && speech.transcribeFile(file, fileLang)}
                   >
                     <IconBolt width={16} height={16} />
                     {speech.fileTranscribing

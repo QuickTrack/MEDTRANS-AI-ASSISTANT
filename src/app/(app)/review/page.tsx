@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Card, Button, Badge } from "@/components/ui";
 import { IconCheck, IconExport, IconMic } from "@/components/icons";
-import { getJob, updateJob } from "@/lib/jobs";
+import { getJob, getLastJobId, updateJob } from "@/lib/jobs";
 import { useTranslate } from "@/lib/translate";
 import { LANGUAGES, floresLang } from "@/lib/languages";
 
@@ -25,14 +25,17 @@ function ReviewInner() {
   const [targetLang, setTargetLang] = useState("en-US");
   const [srcLang, setSrcLang] = useState("en-US");
   const [translated, setTranslated] = useState("");
+  const [job, setJob] = useState<ReturnType<typeof getJob> | null>(null);
   const loadedRef = useRef<string | null>(null);
   const translate = useTranslate();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!jobId || loadedRef.current === jobId) return;
-    const job = getJob(jobId);
-    loadedRef.current = jobId;
+    const effectiveJobId = jobId || getLastJobId();
+    if (!effectiveJobId || loadedRef.current === effectiveJobId) return;
+    const job = getJob(effectiveJobId);
+    loadedRef.current = effectiveJobId;
+    setJob(job);
     const t = job?.transcript ?? "";
     setText(t);
     setHistory([t]);
@@ -211,6 +214,7 @@ function ReviewInner() {
                   ["Words", words],
                   ["Characters", text.length],
                   ["Saved versions", history.length],
+                  ...(job?.speakers ? [["Speakers", job.speakers]] : []),
                 ].map(([label, val]) => (
                   <div
                     key={label as string}
@@ -236,7 +240,7 @@ function ReviewInner() {
                   value={srcLang}
                   onChange={(e) => setSrcLang(e.target.value)}
                   aria-label="Source language"
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
                 >
                   {LANGUAGES.filter((l) => l.code !== "auto").map((l) => (
                     <option key={l.code} value={l.code}>
@@ -244,12 +248,12 @@ function ReviewInner() {
                     </option>
                   ))}
                 </select>
-                <span className="text-slate-400">→</span>
+                <span className="shrink-0 text-slate-400">→</span>
                 <select
                   value={targetLang}
                   onChange={(e) => setTargetLang(e.target.value)}
                   aria-label="Target language"
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-[#2d7ff9] dark:border-slate-700 dark:bg-slate-800/60"
                 >
                   {LANGUAGES.map((l) => (
                     <option key={l.code} value={l.code}>
@@ -257,18 +261,19 @@ function ReviewInner() {
                     </option>
                   ))}
                 </select>
-                <Button
-                  variant="accent"
-                  disabled={translate.translating || !text.trim()}
-                  onClick={handleTranslate}
-                >
-                  {translate.translating
-                    ? translate.loading
-                      ? `Loading ${translate.progress}%`
-                      : "Translating…"
-                    : "Translate"}
-                </Button>
               </div>
+              <Button
+                variant="accent"
+                className="mt-2 w-full"
+                disabled={translate.translating || !text.trim()}
+                onClick={handleTranslate}
+              >
+                {translate.translating
+                  ? translate.loading
+                    ? `Loading ${translate.progress}%`
+                    : "Translating…"
+                  : "Translate"}
+              </Button>
               {translate.error && (
                 <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">
                   {translate.error}
