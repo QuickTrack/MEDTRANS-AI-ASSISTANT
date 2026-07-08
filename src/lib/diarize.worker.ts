@@ -15,7 +15,7 @@ type ProgressInfo = {
 
 let extractor: FeatureExtractionPipeline | null = null;
 
-const MODEL = "Xenova/wav2vec2-base-superb-sv";
+const MODEL = "Xenova/wav2vec2-base-960h";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -52,9 +52,11 @@ function toEmbedding(out: unknown): number[] {
     embeddings?: { data?: Float32Array };
     embedding?: { data?: Float32Array };
     last_hidden_state?: { data?: Float32Array; dims?: number[] };
+    logits?: { data?: Float32Array; dims?: number[] };
   };
   if (o.embeddings?.data) return Array.from(o.embeddings.data);
   if (o.embedding?.data) return Array.from(o.embedding.data);
+  if (o.logits?.data) return Array.from(o.logits.data);
   if (o.last_hidden_state?.data && o.last_hidden_state.dims) {
     const [b, t, d] = o.last_hidden_state.dims;
     const data = o.last_hidden_state.data;

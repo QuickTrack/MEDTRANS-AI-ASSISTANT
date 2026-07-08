@@ -1,9 +1,9 @@
 "use client";
 
-const MODEL = "Xenova/wav2vec2-base-superb-sv";
+const MODEL = "Xenova/wav2vec2-base-960h";
 const CHUNK_SEC = 3;
 const MAX_SPEAKERS = 6;
-const SIM_THRESHOLD = 0.7;
+const SIM_THRESHOLD = 0.6;
 
 export type SpeakerStatus = {
   loading: boolean;
