@@ -113,12 +113,20 @@ function startNextServer(port) {
   logError("[boot] serverEntry exists=", fs.existsSync(serverEntry));
   logError("[boot] nodeBin=", nodeBin);
 
+  const polyfill = path.join(__dirname, "polyfill.cjs");
   const env = {
     ...process.env,
     PORT: String(port),
     HOSTNAME: "127.0.0.1",
     NODE_ENV: "production",
   };
+  // Ensure the standalone Next server always has replaceAll available even if
+  // it is launched with an older system Node via the findNode() fallback.
+  if (fs.existsSync(polyfill)) {
+    env.NODE_OPTIONS = [process.env.NODE_OPTIONS, `-r ${polyfill}`]
+      .filter(Boolean)
+      .join(" ");
+  }
 
   const proc = spawn(nodeBin, [serverEntry], {
     cwd: standaloneDir,
